@@ -47,9 +47,10 @@ class Cave:
         self.__iter_count = 0
         self.pits_count = self.pits_count(cave)
         self.layout = self.layout_maker(cave)
-        self.treasure = self.treasure_pos(cave)
         self.__layout_info_filler()
-
+        self.treasure = self.__treasure_pos()
+        self.wumpus = self.__wumpus_pos()
+        self.pits = self.__pits_pos()
 
     def __getitem__(self, item):
         return self.layout[item]
@@ -62,6 +63,7 @@ class Cave:
         return self[self.__iter_count]
 
     def __iter__(self):
+        self.__iter_count = 0
         return self
 
     def __str__(self):
@@ -77,12 +79,26 @@ class Cave:
             pits += row.count("P")
         return pits
 
-    @staticmethod
-    def treasure_pos(cave):
-        for row in range(4):
-            for col in range(4):
-                if cave[row][col] == "G":
-                    return [row, col]
+    def __treasure_pos(self):
+        for field in self:
+            for info in field.info:
+                if info == "G":
+                    return field
+
+    def __wumpus_pos(self):
+        for field in self:
+            for info in field.info:
+                if info == "W":
+                    return field
+
+    def __pits_pos(self):
+        result_pits = []
+        for field in self:
+            for info in field.info:
+                if info == "P":
+                    result_pits.append(field)
+        return result_pits
+
 
     @staticmethod
     def layout_maker(cave):
@@ -109,7 +125,7 @@ class Cave:
                         self[neighbor].possible_moves = []
 
     def kill_wumpus(self):
-        pass
+            pass
 
 
 class Agent:
@@ -266,3 +282,7 @@ for i in a:
 print(a)
 print(a[2].possible_moves)
 print(a[1].possible_moves)
+print(a.treasure.number, a.treasure.possible_moves, a.treasure)
+print(a.wumpus.number)
+print(a.pits[0].number, a.pits[1].number, a.pits[2].number)
+
