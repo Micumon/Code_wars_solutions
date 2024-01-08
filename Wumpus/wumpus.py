@@ -10,6 +10,14 @@ class Field:
         return ", ".join(self.__info)
 
     @property
+    def left_moves(self):
+        left_moves = [i for i in self.possible_moves if i not in self.made_moves]
+        if left_moves:
+            return left_moves
+        else:
+            return False
+
+    @property
     def info(self):
         return self.__info
 
@@ -150,10 +158,39 @@ class Agent:
         self.cave = Cave(ag_cave)
         self.wumpus_knowledge = [i for i in self.cave]
         self.pit_knowledge = dict()
-        self.__route = [self.cave[1]]
+        self.__been = [self.cave[1]]
+
+    @property
+    def been(self):
+        return self.__been
+
+    @been.setter
+    def been(self, new: Field):
+        if new in self.wumpus_knowledge:
+            self.wumpus_knowledge.remove(new)
+        if new not in self.__been:
+            self.__been.append(new)
+
+    def __where_to_go(self):
+        if self.been[-1].left_moves:
+            return self.cave[self.been[-1].left_moves[0]], "ahead"
+        else:
+            return self.__go_back(), "back"
+
+    def __go_back(self):
+        for field in self.been:
+            if field.left_moves:
+                return self.cave[field.left_moves[0]]
+        return False
+
+    def __move(self, direction):
+        pass
 
     def run_simulation(self):
-        pass
+        move, direction = self.__where_to_go()
+        if move:
+            self.__move(direction)
+
 
     @staticmethod
     def win(self):
