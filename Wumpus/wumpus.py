@@ -17,6 +17,18 @@ class Field:
     def info(self, info):
         self.__info.append(info)
 
+    @property
+    def is_wumpus(self):
+        return True if "W" in self.__info else False
+
+    @property
+    def is_pit(self):
+        return True if "P" in self.__info else False
+
+    @property
+    def is_treasure(self):
+        return True if "G" in self.__info else False
+
     def __possible_moves_maker(self):
         if self.info == "P" or self.info == "W":
             return []
@@ -45,12 +57,11 @@ class Field:
 class Cave:
     def __init__(self, cave):
         self.__iter_count = 0
-        self.pits_count = self.pits_count(cave)
         self.layout = self.layout_maker(cave)
         self.__layout_info_filler()
         self.treasure = self.__treasure_pos()
         self.wumpus = self.__wumpus_pos()
-        self.pits = self.__pits_pos()
+        self.pits, self.pits_count = self.__pits_pos_count()
 
     def __getitem__(self, item):
         return self.layout[item]
@@ -72,33 +83,25 @@ class Cave:
             string_out += f"|\t{self[row]}\t||\t{self[row + 1]}\t||\t{self[row + 2]}\t||\t{self[row + 3]}\t|\n"
         return string_out
 
-    @staticmethod
-    def pits_count(cave):
-        pits = 0
-        for row in cave:
-            pits += row.count("P")
-        return pits
-
     def __treasure_pos(self):
         for field in self:
-            for info in field.info:
-                if info == "G":
-                    return field
+            if field.is_treasure:
+                return field
 
     def __wumpus_pos(self):
         for field in self:
-            for info in field.info:
-                if info == "W":
-                    return field
+            if field.is_wumpus:
+                return field
 
-    def __pits_pos(self):
+    def __pits_pos_count(self):
         result_pits = []
         for field in self:
-            for info in field.info:
-                if info == "P":
-                    result_pits.append(field)
-        return result_pits
-
+            if field.is_pit:
+                result_pits.append(field)
+        pits = 0
+        for field in self:
+            pits += 1 if field.is_pit else 0
+        return result_pits, pits
 
     @staticmethod
     def layout_maker(cave):
@@ -125,139 +128,40 @@ class Cave:
                         self[neighbor].possible_moves = []
 
     def kill_wumpus(self):
-            pass
+        self.wumpus.info.remove("W")
+        if "pp" not in self.wumpus.info:
+            self.wumpus.possible_moves = list(self.wumpus.adjacent)
+        for neighbor in self.wumpus.adjacent:
+            self[neighbor].info.remove("ww")
+            if "pp" in self[neighbor].info:
+                self[neighbor].possible_moves.append(self.wumpus.number)
+            else:
+                self[neighbor].possible_moves = list(self[neighbor].adjacent)
+
+    def located_pit(self, pit: Field):
+        for field in pit.adjacent:
+            self[field].info.remove("pp")
+            if "pp" not in self[field].info and "ww" not in self[field].info:
+                self[field].possible_moves = [i for i in self[field].adjacent if i != pit.number]
 
 
 class Agent:
     def __init__(self, ag_cave):
-        self.route = [(0, 0)]
         self.cave = Cave(ag_cave)
-        self.wumpus_knowledge = [(i, j) for i in range(4) for j in range(4) if (i, j) != (0, 0)]
-        self.__wumpus_knowledge_not = [(0, 0)]
-        self.pit_knowledge = {m + 1: [(i, j) for i in range(4) for j in range(4) if (i, j) != (0, 0)]
-                              for m in range(self.cave.pits_count)}
-        self.__pit_knowledge_not = [(0, 0)]
-        self.field_is_clear = [(0, 0)]
-        self.back = ()
-        self.map = {(0, 0): {"pos": self.possible_moves,
-                             "made": []}
-                    }
+        self.wumpus_knowledge = [i for i in self.cave]
+        self.pit_knowledge = dict()
+        self.__route = [self.cave[1]]
 
-    @property
-    def wumpus_knowledge_not(self):
-        return self.__wumpus_knowledge_not
-
-    @wumpus_knowledge_not.setter
-    def wumpus_knowledge_not(self, value):
-        try:
-            self.wumpus_knowledge.remove(value)
-        except ValueError:
-            pass
-
-        if value not in self.__wumpus_knowledge_not:
-            self.__wumpus_knowledge_not.append(value)
-
-    @property
-    def pit_knowledge_not(self):
-        return self.__pit_knowledge_not
-
-    @pit_knowledge_not.setter
-    def pit_knowledge_not(self, value):
-        for i in self.pit_knowledge:
-            try:
-                self.pit_knowledge[i].remove(value)
-            except ValueError:
-                continue
-        if value not in self.__pit_knowledge_not:
-            self.__pit_knowledge_not.append(value)
-
-    @property
-    def field_restr(self):
-        return cave[self.position[0]][self.position[1]].split("|")
-
-    @property
-    def position(self):
-        return self.route[-1]
-
-    @property
-    def possible_moves(self):
-        possible_moves = ["l", "r", "u", "d"]
-        for restr in self.field_restr:
-            match restr:
-                case "ui":
-                    try:
-                        possible_moves.remove("u")
-                    except ValueError:
-                        continue
-                case "li":
-                    try:
-                        possible_moves.remove("l")
-                    except ValueError:
-                        continue
-                case "di":
-                    try:
-                        possible_moves.remove("d")
-                    except ValueError:
-                        continue
-                case "ri":
-                    try:
-                        possible_moves.remove("r")
-                    except ValueError:
-                        continue
-                case "G":
-                    self.win()
-        return possible_moves
-
-    def check_wumpus_knowledge(self):
-        if len(self.wumpus_knowledge) == 1:
-            self.cave.kill_wumpus()
-
-    def entered_ww(self):
-        ww = self.position
-        adjacent_to_ww = [(ww[0] - 1, ww[1]), (ww[0], ww[1] - 1), (ww[0] + 1, ww[1]), (ww[0], ww[1] + 1)]
-        wumpus_maybe = self.wumpus_knowledge.copy()
-        self.wumpus_knowledge = [i for i in adjacent_to_ww if i in wumpus_maybe]
-        if len(self.wumpus_knowledge) == 1:
-            self.cave.kill_wumpus()
-
-    def entered_pp(self):
-        pp = self.position
-        adjacent_to_pp = [(pp[0] - 1, pp[1]), (pp[0], pp[1] - 1), (pp[0] + 1, pp[1]), (pp[0], pp[1] + 1)]
-
-    def new_info(self):
-        result = False
-        for restr in self.field_restr:
-            match restr:
-                case "ww":
-                    self.entered_ww()
-                    result = True
-                case "pp":
-                    self.entered_pp()
-                    result = True
-        return result
-
-    def check_new_moves(self):
-        for field in self.map:
-            if not set(self.map[field]["pos"]) == set(self.map[field]["made"]):
-                self.go_to(field)
-
-    def go_to(self, field):
+    def run_simulation(self):
         pass
 
-    def move(self):
-        self.pit_knowledge_not = self.position
-        self.wumpus_knowledge_not = self.position
-        back_move = self.new_info()
-        if self.back == () and back_move:
-            self.loose()
-        if back_move:
-            self.check_new_moves()
-
+    @staticmethod
     def win(self):
-        pass
+        return True
 
+    @staticmethod
     def loose(self):
-        pass
+        return False
 
 
 cave = [
@@ -269,20 +173,8 @@ cave = [
 
 
 def wumpus_world(cave):
-    pass
+    player = Agent(cave)
+    return player.run_simulation()
 
 
-for i in range(1, 17):
-    print(f"dla {i}: " + str(Field(i, "a").adjacent))
-
-a = Cave(cave)
-for i in a:
-    print(f"{i.number} = {i.possible_moves}, {i.info}")
-
-print(a)
-print(a[2].possible_moves)
-print(a[1].possible_moves)
-print(a.treasure.number, a.treasure.possible_moves, a.treasure)
-print(a.wumpus.number)
-print(a.pits[0].number, a.pits[1].number, a.pits[2].number)
 

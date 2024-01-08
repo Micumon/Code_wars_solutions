@@ -1,4 +1,3 @@
-
     # for row in range(4):
     #     for col in range(4):
     #         if col != 0 and row != 0 and row != 3 and col != 3 and (cave[row][col] == "W" or cave[row][col] == "P"):
@@ -41,7 +40,7 @@
     #         if col == 3:
     #             cave[row][col] += "|ri|"
 
-a= [1,2,3]
+a = [1,2,3]
 try:
     a.remove(4)
 except ValueError:
