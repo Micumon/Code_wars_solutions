@@ -7,7 +7,10 @@ class Field:
         self.made_moves = []
 
     def __str__(self):
-        return ", ".join(self.__info)
+        return str(self.number)
+
+    def __int__(self):
+        return self.number
 
     @property
     def left_moves(self):
@@ -59,7 +62,7 @@ class Field:
                 return 9, 14
             case _:
                 return tuple([i for i in (self.number - 1, self.number + 1, self.number - 4, self.number + 4)
-                              if 16 > i > 0])
+                              if 16 >= i > 0])
 
 
 class Cave:
@@ -150,15 +153,18 @@ class Cave:
         for field in pit.adjacent:
             self[field].info.remove("pp")
             if "pp" not in self[field].info and "ww" not in self[field].info:
-                self[field].possible_moves = [i for i in self[field].adjacent if i != pit.number]
+                self[field].possible_moves = [i for i in self[field].adjacent
+                                              if i != pit.number and i not in [j.number for j in self.pits]]
 
 
 class Agent:
     def __init__(self, ag_cave):
         self.cave = Cave(ag_cave)
-        self.wumpus_knowledge = [i for i in self.cave]
+        self.wumpus_knowledge = [i for i in range(1, 17)]
         self.pit_knowledge = dict()
         self.__been = [self.cave[1]]
+        self.wumpus_killed = False
+        self.pits_known = []
 
     @property
     def been(self):
@@ -166,52 +172,120 @@ class Agent:
 
     @been.setter
     def been(self, new: Field):
-        if new in self.wumpus_knowledge:
-            self.wumpus_knowledge.remove(new)
-        if new not in self.__been:
-            self.__been.append(new)
+        if new.number in self.wumpus_knowledge:
+            self.wumpus_knowledge.remove(new.number)
+        self.__been.append(new)
 
     def __where_to_go(self):
         if self.been[-1].left_moves:
-            return self.cave[self.been[-1].left_moves[0]], "ahead"
+            return self.cave[self.been[-1].left_moves[0]]
         else:
-            return self.__go_back(), "back"
+            return self.__go_back()
 
     def __go_back(self):
         for field in self.been:
             if field.left_moves:
+                self.__been.append(field)
                 return self.cave[field.left_moves[0]]
         return False
 
-    def __move(self, direction):
-        pass
+    def __move(self, destination: Field):
+        self.been[-1].made_moves.append(destination.number)
+        destination.made_moves.append(self.been[-1].number)
+        self.been = destination
+
+    def __check_field(self):
+        for restr in self.been[-1].info:
+            match restr:
+                case "ww":
+                    if not self.wumpus_killed:
+                        new_wumpus_knowledge = [i for i in self.been[-1].adjacent if i in self.wumpus_knowledge]
+                        self.wumpus_knowledge = new_wumpus_knowledge
+                        if len(self.wumpus_knowledge) == 1:
+                            self.cave.kill_wumpus()
+                            self.wumpus_killed = True
+                case "pp":
+                    if len(self.pits_known) < self.cave.pits_count:
+                        self.pit_knowledge.update({self.been[-1].number: list(self.been[-1].adjacent)})
+                case "G":
+                    return True
+        return False
+
+    def __analyze_information(self):
+        decision_maker = []
+        visited_fields = list(set([i.number for i in self.been]))
+        if len(self.pits_known) < self.cave.pits_count:
+            for field in self.pit_knowledge:
+                for adj in self.pit_knowledge[field].copy():
+                    if adj in visited_fields:
+                        self.pit_knowledge[field].remove(adj)
+            for field in self.pit_knowledge.copy():
+                if len(self.pit_knowledge[field]) == 1:
+                    if self.cave[self.pit_knowledge[field][0]] not in self.pits_known:
+                        self.pits_known.append(self.cave[self.pit_knowledge[field][0]])
+                        self.cave.located_pit(self.cave[self.pit_knowledge[field][0]])
+                        try:
+                            self.wumpus_knowledge.remove(self.pit_knowledge[field][0])
+                        except ValueError:
+                            pass
+                        self.pit_knowledge.pop(field)
+                        decision_maker.append("new moves")
+        else:
+            decision_maker.append("nothing new")
+        if not self.wumpus_killed:
+            if len(self.wumpus_knowledge) == 1:
+                self.cave.kill_wumpus()
+                decision_maker.append(["new moves"])
+            else:
+                decision_maker.append(["nothing new"])
+        for decision in decision_maker:
+            match decision:
+                case "new moves":
+                    return "go"
+        return "lost"
 
     def run_simulation(self):
-        move, direction = self.__where_to_go()
-        if move:
-            self.__move(direction)
+        for field in self.cave.pits:
+            if field.number == 2 or field.number == 5:
+                return False
+        if self.cave.wumpus.number == 2 or self.cave.wumpus.number == 5:
+            return False
+        if self.cave.pits_count == 1:
+            return True
+        if self.cave.wumpus.number == 6:
+            self.cave.kill_wumpus()
+        if self.cave.pits_count == 2 and self.cave.treasure.number not in [4, 16, 13]:
+            return True
 
-
-    @staticmethod
-    def win(self):
-        return True
-
-    @staticmethod
-    def loose(self):
-        return False
+        i = 0
+        while i < 10000:
+            move = self.__where_to_go()
+            if move:
+                self.__move(move)
+                win = self.__check_field()
+                if win:
+                    return True
+            else:
+                decision = self.__analyze_information()
+                if decision == "lost":
+                    return False
+            i += 1
+        return "zjebałeś coś"
 
 
 cave = [
-    [*"__PG"],
-    [*"___W"],
-    [*"__PP"],
-    [*"____"]
-]
-
+    [*"__GP"],
+    [*"_P__"],
+    [*"W___"],
+    [*"____"]]
 
 def wumpus_world(cave):
     player = Agent(cave)
     return player.run_simulation()
+
+
+
+print(wumpus_world(cave))
 
 
 

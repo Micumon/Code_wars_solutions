@@ -40,8 +40,13 @@
     #         if col == 3:
     #             cave[row][col] += "|ri|"
 
-a = [1,2,3]
-try:
-    a.remove(4)
-except ValueError:
-    print("error")
+# a = [1,2,3]
+# try:
+#     a.remove(4)
+# except ValueError:
+#     print("error")
+
+a = {1: 2}
+print(a)
+a.update({1: 3})
+print(a)
