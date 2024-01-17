@@ -154,13 +154,14 @@ class Cave:
             self[field].info.remove("pp")
             if "pp" not in self[field].info and "ww" not in self[field].info:
                 self[field].possible_moves = [i for i in self[field].adjacent
-                                              if i != pit.number and i not in [j.number for j in self.pits]]
+                                              if i != pit.number and i not in [j.number for j in self.pits] and
+                                              i != self.wumpus.number]
 
 
 class Agent:
     def __init__(self, ag_cave):
         self.cave = Cave(ag_cave)
-        self.wumpus_knowledge = [i for i in range(1, 17)]
+        self.wumpus_knowledge = [i for i in range(2, 17)]
         self.pit_knowledge = dict()
         self.__been = [self.cave[1]]
         self.wumpus_killed = False
@@ -195,7 +196,7 @@ class Agent:
         self.been = destination
 
     def __check_field(self):
-        for restr in self.been[-1].info:
+        for restr in self.been[-1].info.copy():
             match restr:
                 case "ww":
                     if not self.wumpus_killed:
@@ -207,6 +208,14 @@ class Agent:
                 case "pp":
                     if len(self.pits_known) < self.cave.pits_count:
                         self.pit_knowledge.update({self.been[-1].number: list(self.been[-1].adjacent)})
+                    if len(self.pit_knowledge) > self.cave.pits_count - len(self.pits_known):
+                        for pit in [i for i in self.cave.pits if i not in self.pits_known]:
+                            self.cave.located_pit(pit)
+                            self.pits_known.append(pit)
+                            try:
+                                self.wumpus_knowledge.remove(pit.number)
+                            except ValueError:
+                                pass
                 case "G":
                     return True
         return False
@@ -215,7 +224,7 @@ class Agent:
         decision_maker = []
         visited_fields = list(set([i.number for i in self.been]))
         if len(self.pits_known) < self.cave.pits_count:
-            for field in self.pit_knowledge:
+            for field in self.pit_knowledge.copy():
                 for adj in self.pit_knowledge[field].copy():
                     if adj in visited_fields:
                         self.pit_knowledge[field].remove(adj)
@@ -235,9 +244,10 @@ class Agent:
         if not self.wumpus_killed:
             if len(self.wumpus_knowledge) == 1:
                 self.cave.kill_wumpus()
-                decision_maker.append(["new moves"])
+                self.wumpus_killed = True
+                decision_maker.append("new moves")
             else:
-                decision_maker.append(["nothing new"])
+                decision_maker.append("nothing new")
         for decision in decision_maker:
             match decision:
                 case "new moves":
@@ -254,8 +264,9 @@ class Agent:
             return True
         if self.cave.wumpus.number == 6:
             self.cave.kill_wumpus()
-        if self.cave.pits_count == 2 and self.cave.treasure.number not in [4, 16, 13]:
-            return True
+            self.wumpus_killed = True
+        # if self.cave.pits_count == 2 and self.cave.treasure.number not in [4, 16, 13]:
+        #     return True
 
         i = 0
         while i < 10000:
@@ -274,10 +285,11 @@ class Agent:
 
 
 cave = [
-    [*"__GP"],
-    [*"_P__"],
-    [*"W___"],
-    [*"____"]]
+    [*"__P_"],
+    [*"____"],
+    [*"WP__"],
+    [*"_G__"]
+]
 
 def wumpus_world(cave):
     player = Agent(cave)
@@ -288,4 +300,4 @@ def wumpus_world(cave):
 print(wumpus_world(cave))
 
 
-
+"""Trzeba ogarnąć sąsiadów pól podejrzanych w wumpusie i w pitach"""
